@@ -2,7 +2,7 @@ name: Check for Updates
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '23 * * * *' # Hourly at :23 — offset off the top of the hour, which GitHub drops/delays under peak load
   workflow_dispatch:
     inputs:
       version:
@@ -81,7 +81,7 @@ jobs:
           ### Changes
           - Updated `version` in `package.nix`
           - Updated native binary hashes for all platforms
-          - Updated npm tarball hash
+          - Updated `flake.lock`
 
           ### Checklist
           - [ ] Build passes

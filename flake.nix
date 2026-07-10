@@ -9,8 +9,7 @@
   outputs = { self, nixpkgs, flake-utils }:
     let
       overlay = final: prev: {
-        codex = final.callPackage ./package.nix { runtime = "native"; };
-        codex-node = final.callPackage ./package.nix { runtime = "node"; };
+        codex = final.callPackage ./package.nix { };
       };
     in
     flake-utils.lib.eachDefaultSystem (system:
@@ -25,9 +24,8 @@
         packages = {
           default = pkgs.codex;
           codex = pkgs.codex;
-          codex-node = pkgs.codex-node;
         };
-        
+
         apps = {
           default = {
             type = "app";
@@ -36,10 +34,6 @@
           codex = {
             type = "app";
             program = "${pkgs.codex}/bin/codex";
-          };
-          codex-node = {
-            type = "app";
-            program = "${pkgs.codex-node}/bin/codex-node";
           };
         };
 

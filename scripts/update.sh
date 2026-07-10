@@ -7,12 +7,9 @@ readonly YELLOW='\033[1;33m'
 readonly NC='\033[0m'
 
 readonly GITHUB_REPO="openai/codex"
-readonly NPM_REGISTRY_URL="https://registry.npmjs.org"
-readonly NPM_PACKAGE_NAME="@openai/codex"
 readonly GITHUB_RELEASE_BASE="https://github.com/${GITHUB_REPO}/releases/download"
 
 readonly NATIVE_PLATFORMS=("aarch64-apple-darwin" "x86_64-apple-darwin" "x86_64-unknown-linux-musl" "aarch64-unknown-linux-musl")
-readonly NODE_PLATFORMS=("darwin-arm64" "darwin-x64" "linux-x64" "linux-arm64")
 
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
@@ -42,46 +39,9 @@ fetch_native_hash() {
     echo "$hash" | tr -d '\n'
 }
 
-fetch_npm_hash() {
-    local version="$1"
-    local url="${NPM_REGISTRY_URL}/${NPM_PACKAGE_NAME}/-/codex-${version}.tgz"
-
-    local hash
-    hash=$(nix-prefetch-url "$url" 2>/dev/null | tail -1)
-    echo "$hash" | tr -d '\n'
-}
-
-fetch_node_optional_dep_hash() {
-    local version="$1"
-    local platform="$2"
-    local url="${GITHUB_RELEASE_BASE}/rust-v${version}/codex-npm-${platform}-${version}.tgz"
-
-    local hash
-    hash=$(nix-prefetch-url "$url" 2>/dev/null | tail -1)
-    echo "$hash" | tr -d '\n'
-}
-
 update_package_version() {
     local version="$1"
     sed -i.bak "s/version = \".*\"/version = \"$version\"/" package.nix
-}
-
-update_npm_hash() {
-    local hash="$1"
-    local temp_file
-    temp_file=$(mktemp)
-    awk -v hash="$hash" '
-        /npmTarball = / { in_tarball_block=1 }
-        in_tarball_block && /fetchurl/ { in_fetchurl_block=1 }
-        in_fetchurl_block && /sha256 = / {
-            sub(/sha256 = "[^"]*"/, "sha256 = \"" hash "\"")
-            in_tarball_block=0
-            in_fetchurl_block=0
-        }
-        in_tarball_block && /^[[:space:]]*else/ { in_tarball_block=0 }
-        { print }
-    ' package.nix > "$temp_file"
-    mv "$temp_file" package.nix
 }
 
 update_native_hash() {
@@ -96,23 +56,6 @@ update_native_hash() {
             sub(/= "[^"]*"/, "= \"" hash "\"")
         }
         in_native_block && /\};/ { in_native_block=0 }
-        { print }
-    ' package.nix > "$temp_file"
-    mv "$temp_file" package.nix
-}
-
-update_node_optional_dep_hash() {
-    local platform="$1"
-    local hash="$2"
-    local temp_file
-    temp_file=$(mktemp)
-
-    awk -v platform="$platform" -v hash="$hash" '
-        /nodeOptionalDepHashes = \{/ { in_block=1 }
-        in_block && $0 ~ "\"" platform "\"" {
-            sub(/= "[^"]*"/, "= \"" hash "\"")
-        }
-        in_block && /\};/ { in_block=0 }
         { print }
     ' package.nix > "$temp_file"
     mv "$temp_file" package.nix
@@ -143,34 +86,9 @@ update_to_version() {
         update_native_hash "$platform" "$native_hash"
     done
 
-    log_info "Fetching npm tarball hash..."
-    local npm_hash
-    npm_hash=$(fetch_npm_hash "$new_version")
-    if [ -z "$npm_hash" ]; then
-        log_error "Failed to fetch npm tarball hash"
-        mv package.nix.bak package.nix
-        exit 1
-    fi
-    log_info "NPM tarball hash: $npm_hash"
-    update_npm_hash "$npm_hash"
-
-    log_info "Fetching node platform-specific dependency hashes..."
-    for node_platform in "${NODE_PLATFORMS[@]}"; do
-        log_info "  Fetching hash for $node_platform..."
-        local node_dep_hash
-        node_dep_hash=$(fetch_node_optional_dep_hash "$new_version" "$node_platform")
-        if [ -z "$node_dep_hash" ]; then
-            log_error "Failed to fetch node optional dep hash for $node_platform"
-            mv package.nix.bak package.nix
-            exit 1
-        fi
-        log_info "  $node_platform: $node_dep_hash"
-        update_node_optional_dep_hash "$node_platform" "$node_dep_hash"
-    done
-
     cleanup_backup_files
 
-    log_info "Verifying builds..."
+    log_info "Verifying build..."
 
     log_info "  Building codex (native)..."
     if ! nix build .#codex > /dev/null 2>&1; then
@@ -178,13 +96,7 @@ update_to_version() {
         return 1
     fi
 
-    log_info "  Building codex-node..."
-    if ! nix build .#codex-node > /dev/null 2>&1; then
-        log_error "Node build verification failed"
-        return 1
-    fi
-
-    log_info "✅ All builds successful!"
+    log_info "✅ Build successful!"
     return 0
 }
 
