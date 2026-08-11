@@ -39,6 +39,16 @@ fetch_native_hash() {
     echo "$hash" | tr -d '\n'
 }
 
+fetch_code_mode_host_hash() {
+    local version="$1"
+    local platform="$2"
+    local url="${GITHUB_RELEASE_BASE}/rust-v${version}/codex-code-mode-host-${platform}.tar.gz"
+
+    local hash
+    hash=$(nix-prefetch-url "$url" 2>/dev/null | tail -1)
+    echo "$hash" | tr -d '\n'
+}
+
 update_package_version() {
     local version="$1"
     sed -i.bak "s/version = \".*\"/version = \"$version\"/" package.nix
@@ -56,6 +66,23 @@ update_native_hash() {
             sub(/= "[^"]*"/, "= \"" hash "\"")
         }
         in_native_block && /\};/ { in_native_block=0 }
+        { print }
+    ' package.nix > "$temp_file"
+    mv "$temp_file" package.nix
+}
+
+update_code_mode_host_hash() {
+    local platform="$1"
+    local hash="$2"
+    local temp_file
+    temp_file=$(mktemp)
+
+    awk -v platform="$platform" -v hash="$hash" '
+        /codeModeHostHashes = \{/ { in_block=1 }
+        in_block && $0 ~ "\"" platform "\"" {
+            sub(/= "[^"]*"/, "= \"" hash "\"")
+        }
+        in_block && /\};/ { in_block=0 }
         { print }
     ' package.nix > "$temp_file"
     mv "$temp_file" package.nix
@@ -84,6 +111,20 @@ update_to_version() {
         fi
         log_info "  $platform: $native_hash"
         update_native_hash "$platform" "$native_hash"
+    done
+
+    log_info "Fetching code-mode host hashes..."
+    for platform in "${NATIVE_PLATFORMS[@]}"; do
+        log_info "  Fetching hash for $platform..."
+        local code_mode_host_hash
+        code_mode_host_hash=$(fetch_code_mode_host_hash "$new_version" "$platform")
+        if [ -z "$code_mode_host_hash" ]; then
+            log_error "Failed to fetch code-mode host hash for $platform"
+            mv package.nix.bak package.nix
+            exit 1
+        fi
+        log_info "  $platform: $code_mode_host_hash"
+        update_code_mode_host_hash "$platform" "$code_mode_host_hash"
     done
 
     cleanup_backup_files

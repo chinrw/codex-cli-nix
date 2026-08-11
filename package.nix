@@ -31,9 +31,24 @@ let
     "aarch64-unknown-linux-musl" = "144bndc8zacczpwvc2wn3llb256nx1k3n20x9f5spcb6ys07qrzb";
   };
 
+  # codex >= 0.143 spawns a separate `codex-code-mode-host` binary (found
+  # next to the running executable) when "code mode" is enabled. Shipped as its
+  # own release asset, so the native build must fetch and install it too.
+  codeModeHostHashes = {
+    "aarch64-apple-darwin" = "0ppvvn9fwqp0d77fsaqnbiga3ysglfjyxzmpsc4434dzhxhvzkan";
+    "x86_64-apple-darwin" = "12n4zcklj2jvhshv7n8psip7zc861f5ih5n8g47sdpp4im8a0cbi";
+    "x86_64-unknown-linux-musl" = "0mj3vnhrgyxp71wqi0x22y32wnyv4iv5z2dmrngyqqw3mkxasih1";
+    "aarch64-unknown-linux-musl" = "0z1w9nssbr95wa3slwq5dn1s8gbfz2v3375gg380xcsdxacgzm6z";
+  };
+
   nativeBinary = fetchurl {
     url = "https://github.com/openai/codex/releases/download/rust-v${version}/codex-${platform}.tar.gz";
     sha256 = nativeHashes.${platform};
+  };
+
+  codeModeHost = fetchurl {
+    url = "https://github.com/openai/codex/releases/download/rust-v${version}/codex-code-mode-host-${platform}.tar.gz";
+    sha256 = codeModeHostHashes.${platform};
   };
 
   linuxRuntimePath = lib.makeBinPath (lib.optionals stdenv.isLinux [ bubblewrap ]);
@@ -56,6 +71,10 @@ stdenv.mkDerivation {
     mv build/codex-${platform} build/codex
     chmod u+w,+x build/codex
 
+    tar -xzf ${codeModeHost} -C build
+    mv build/codex-code-mode-host-${platform} build/codex-code-mode-host
+    chmod u+w,+x build/codex-code-mode-host
+
     runHook postBuild
   '';
 
@@ -65,6 +84,8 @@ stdenv.mkDerivation {
 
     cp build/codex $out/bin/codex-raw
     chmod +x $out/bin/codex-raw
+    cp build/codex-code-mode-host $out/bin/codex-code-mode-host
+    chmod +x $out/bin/codex-code-mode-host
     makeWrapper "$out/bin/codex-raw" "$out/bin/${binName}" \
       --run 'export CODEX_EXECUTABLE_PATH="$HOME/.local/bin/${binName}"' \
       --set DISABLE_AUTOUPDATER 1 \
