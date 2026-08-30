@@ -70,7 +70,7 @@ jobs:
       id: create-pr
       uses: peter-evans/create-pull-request@v6
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.CODEX_UPDATE_TOKEN }}
         commit-message: "chore: update codex to version ${{ steps.check.outputs.new_version }}"
         title: "chore: update codex to version ${{ steps.check.outputs.new_version }}"
         body: |
@@ -98,7 +98,7 @@ jobs:
     - name: Enable Auto-Merge
       if: steps.check.outputs.update_needed == 'true' && steps.create-pr.outputs.pull-request-number
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.CODEX_UPDATE_TOKEN }}
       run: |
         gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash --delete-branch
 
