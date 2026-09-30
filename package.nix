@@ -12,7 +12,7 @@
 }:
 
 let
-  version = "0.159.2";
+  version = "0.159.3";
 
   platformMap = {
     "aarch64-darwin" = "aarch64-apple-darwin";
@@ -25,20 +25,20 @@ let
     (throw "Codex is not supported on ${stdenv.hostPlatform.system}. Supported: aarch64-darwin, x86_64-darwin, x86_64-linux, aarch64-linux");
 
   nativeHashes = {
-    "aarch64-apple-darwin" = "0g618fbpkrgp8lyvm29z4zj98z3wqrfmhblmxy49vjfbhkyyyp82";
-    "x86_64-apple-darwin" = "1s9vxzrlxxrqy1qs361ld6fg2z45yy0ffrnx08yxvc85m9qiykiz";
-    "x86_64-unknown-linux-musl" = "1shn2qw15dldy9096w5k443zpw3hsfny33pgn2csfhbd4h6nnn16";
-    "aarch64-unknown-linux-musl" = "03wkgs41bxwm7sh002f0vcv713f1kayn40dz5dwzi934jkaf8bj7";
+    "aarch64-apple-darwin" = "0k3p2ap859k5i789nvdrnqf1i0n2912lgq2alsqbb4m5ksim1pji";
+    "x86_64-apple-darwin" = "1dr4xpa73zsqyx9p5hv9shianhd52ip4f6vwrnkvi29idlhaibnb";
+    "x86_64-unknown-linux-musl" = "1jqv54dz7vgx6pf4qs0n35jj93l9gj9ksb708jwl5gxissra335l";
+    "aarch64-unknown-linux-musl" = "19xynhp5asw716z4gi0xqvqx8rsa271qcjv87rvq0q6d7xxk0pyd";
   };
 
   # codex >= 0.143 spawns a separate `codex-code-mode-host` binary (found
   # next to the running executable) when "code mode" is enabled. Shipped as its
   # own release asset, so the native build must fetch and install it too.
   codeModeHostHashes = {
-    "aarch64-apple-darwin" = "1wl2wjlimm03gw5qhlcp5zl26d2jr56b0swl53hvxsdb7q73r7sg";
-    "x86_64-apple-darwin" = "1hbw0rmhnhvbd1fip6mkwig837n9dds8jk88p73sgapc0iqd3ryg";
-    "x86_64-unknown-linux-musl" = "03v3yz3qmi027vv1rmn6xc6scg9qc40br3i0s4l0gv94gd50qszv";
-    "aarch64-unknown-linux-musl" = "0c34inck7hn5d35ddcyb8gnqqh0621p66qyxcc4p7vsygrrnf681";
+    "aarch64-apple-darwin" = "1ifl2pgqk8fyadiij723wdqzhgjyyqhfpjrizbqzycxpfi1jb8yi";
+    "x86_64-apple-darwin" = "17yb5y34xjpn3izjadg1jf7s7nzdzsx4mj2lf59xj35wqnr8awyj";
+    "x86_64-unknown-linux-musl" = "0f6lmgrhxvhd1jpxf85yii58yfplr0grrqr3a8p3h5y792cdsn0g";
+    "aarch64-unknown-linux-musl" = "0vwfkf8ia9klb53d3xgq9cvfnrmz27zm5gzfpxd13p62fb24gfvw";
   };
 
   nativeBinary = fetchurl {
