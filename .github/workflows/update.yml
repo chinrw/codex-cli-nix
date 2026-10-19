@@ -80,7 +80,7 @@ jobs:
 
           ### Changes
           - Updated `version` in `package.nix`
-          - Updated native binary hashes for all platforms
+          - Updated native package, npm tarball and platform dependency hashes
           - Updated `flake.lock`
 
           ### Checklist
@@ -100,7 +100,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.CODEX_UPDATE_TOKEN }}
       run: |
-        gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash --delete-branch
+        gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch
 
     - name: Summary
       if: always()

@@ -60,11 +60,14 @@ nix run github:sadjow/codex-cli-nix#codex-node
 
 ```bash
 # Install native binary (recommended)
-nix profile install github:sadjow/codex-cli-nix
+nix profile add github:sadjow/codex-cli-nix
 
 # Or install the Node.js version
-nix profile install github:sadjow/codex-cli-nix#codex-node
+nix profile add github:sadjow/codex-cli-nix#codex-node
 ```
+
+On Nix versions before 2.30 that do not provide `nix profile add`, use
+`nix profile install` instead.
 
 ### Optional: Enable Binary Cache for Faster Installation
 
@@ -148,7 +151,7 @@ Add to your Home Manager configuration:
 Two package variants are available:
 
 **`codex` (default, native binary)**
-- Pre-built Rust binary from OpenAI's GitHub releases
+- Pre-built Rust CLI and required companion executable from OpenAI's GitHub releases
 - Self-contained, no runtime dependencies
 - Fastest startup time
 - Supported platforms: `x86_64-linux`, `aarch64-linux`, `x86_64-darwin`, `aarch64-darwin`
@@ -162,6 +165,7 @@ Two package variants are available:
 
 - **Native Rust Binary**: Self-contained binary with no runtime dependencies (default)
 - **Node.js Alternative**: Optional Node.js runtime for compatibility
+- **Shell Completions**: Bash, Fish, and Zsh completions included with the default native package
 - **Version Pinning**: Ensures consistent behavior across different environments
 - **Auto-update Protection**: Prevents unexpected updates that might break your workflow
 - **Cross-platform Support**: Pre-built binaries for Linux and macOS (x86_64 and ARM64)
@@ -181,22 +185,23 @@ nix build
 
 # Enter development shell
 nix develop
+
+# Run package and release-workflow regression checks
+nix develop -c python3 -m unittest discover -s tests
 ```
 
 ## Updating Codex Version
 
 ### Automated Updates
 
-This repository uses GitHub Actions to automatically check for new Codex versions hourly. When a new version is detected:
+This fork checks for new Codex versions every hour at minute 23 UTC. The updater
+refreshes the release hashes, verifies the build, and opens a pull request using
+`CODEX_UPDATE_TOKEN`. It enables auto-merge so the update lands after the branch's
+required checks pass. The update branch is deleted after merging.
 
-1. A pull request is automatically created with the version update
-2. The tarball hash is automatically calculated
-3. Tests run on both Linux and macOS to verify the build
-4. The PR auto-merges if all checks pass
-
-The automated update workflow runs:
-- Every hour (on the hour) UTC
-- On manual trigger via GitHub Actions UI
+You can also run the updater through GitHub Actions with `workflow_dispatch`.
+Cache publishing is managed separately. This fork does not automatically upload
+to Cachix or create version tags.
 
 ### Manual Updates
 
@@ -206,25 +211,20 @@ For manual updates:
    ```bash
    ./scripts/update.sh --check
    ```
-2. Update to latest version:
+2. Update to the latest version:
    ```bash
-   # Get the latest version number from the check above
-   ./scripts/update.sh 0.30.0  # Replace with actual version
+   ./scripts/update.sh
+   ```
+
+   Or update to a specific version:
+   ```bash
+   ./scripts/update.sh --version 0.144.3  # Replace with the desired version
    ```
 3. Test the build:
    ```bash
    nix build
    ./result/bin/codex --version
    ```
-
-### Push to Cachix manually
-```bash
-# Push native binary
-nix build .#codex && cachix push codex-cli ./result
-
-# Push Node.js version
-nix build .#codex-node && cachix push codex-cli ./result
-```
 
 ## Troubleshooting
 
@@ -268,4 +268,5 @@ Contributions are welcome! Please submit pull requests or issues on GitHub.
 ## Related Projects
 
 - [claude-code-nix](https://github.com/sadjow/claude-code-nix) - Similar packaging for Anthropic's Claude Code
+- [Awesome Codex CLI](https://github.com/RoggeOhta/awesome-codex-cli) - Third-party Codex ecosystem directory listing this project
 - [nixpkgs](https://github.com/NixOS/nixpkgs) - The Nix Packages collection
