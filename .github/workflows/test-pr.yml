@@ -3,6 +3,8 @@ name: Test Pull Request
 on:
   pull_request:
     paths:
+      - 'scripts/test-terminal.py'
+      - 'scripts/check-package-portability.py'
       - 'package.nix'
       - 'flake.nix'
       - 'flake.lock'
@@ -47,8 +49,20 @@ jobs:
       - name: Verify package contents
         run: |
           test -f ./result/bin/codex
+          test -x ./result/bin/codex-code-mode-host
+          test -x ./result/lib/codex/bin/codex
+          test -x ./result/lib/codex/bin/codex-code-mode-host
+          test -f ./result/lib/codex/codex-package.json
+          test -x ./result/lib/codex/codex-path/rg
+          python3 scripts/check-package-portability.py ./result/lib/codex/codex-path/rg
+          if [ "$(uname -s)" = Linux ]; then
+            python3 scripts/check-package-portability.py ./result/lib/codex/codex-resources/bwrap
+          fi
 
       - name: Run basic functionality test
         run: |
           ./result/bin/codex --help || true
           ./result/bin/codex --version 2>&1 | grep -E "codex|Codex"
+
+      - name: Test terminal daemon bootstrap
+        run: python3 scripts/test-terminal.py ./result/bin/codex
