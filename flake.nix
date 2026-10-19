@@ -9,7 +9,8 @@
   outputs = { self, nixpkgs, flake-utils }:
     let
       overlay = final: prev: {
-        codex = final.callPackage ./package.nix { };
+        codex = final.callPackage ./package.nix { runtime = "native"; };
+        codex-node = final.callPackage ./package.nix { runtime = "node"; };
       };
     in
     flake-utils.lib.eachDefaultSystem (system:
@@ -24,6 +25,7 @@
         packages = {
           default = pkgs.codex;
           codex = pkgs.codex;
+          codex-node = pkgs.codex-node;
         };
 
         apps = {
@@ -35,10 +37,15 @@
             type = "app";
             program = "${pkgs.codex}/bin/codex";
           };
+          codex-node = {
+            type = "app";
+            program = "${pkgs.codex-node}/bin/codex-node";
+          };
         };
 
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
+            (python3.withPackages (ps: [ ps.pyyaml ]))
             nixpkgs-fmt
             nix-prefetch-git
             cachix

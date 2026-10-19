@@ -1,38 +1,40 @@
-# Repository Settings Configuration
+# Repository settings for automatic updates
 
-This repository requires specific GitHub settings to enable automated updates.
+Configure these settings in `chinrw/codex-cli-nix` so version updates open pull
+requests and merge after the required checks pass.
 
-## Required Settings
+## Workflow permissions
 
-### GitHub Actions Permissions
+Under Settings → Actions → General, allow read and write workflow permissions
+and allow GitHub Actions to create pull requests.
 
-1. Navigate to Settings → Actions → General
-2. Under "Workflow permissions":
-   - Select **"Read and write permissions"**
-   - Check **"Allow GitHub Actions to create and approve pull requests"**
-3. Click Save
+## Update token
 
-These settings allow the `update-claude-code.yml` workflow to:
-- Modify files in the repository
-- Create pull requests for version updates
-- Update the flake.lock file
+Create the Actions secret `CODEX_UPDATE_TOKEN` with a token that can create
+branches and pull requests and enable auto-merge in this repository. The updater
+uses this token for pull requests so their events trigger CI. The built-in
+`GITHUB_TOKEN` remains sufficient for reading release information and checkout.
 
-## Verification
+## Auto-merge
 
-After configuring the settings, you can verify the workflow works by:
+Enable **Allow auto-merge** under Settings → General → Pull Requests. Keep the
+required checks on `main`. The updater requests auto-merge and waits for those
+checks instead of merging the version bump immediately.
 
-```bash
-# Manually trigger the update workflow
-gh workflow run "Update Claude Code Version"
+## Verify an update
 
-# Check the workflow status
-gh run list --workflow="Update Claude Code Version"
+Run and inspect the workflow in this fork:
+
+```sh
+gh workflow run update.yml --repo chinrw/codex-cli-nix
+gh run list --workflow=update.yml --repo chinrw/codex-cli-nix
 ```
 
-## Troubleshooting
+If creating a pull request or enabling auto-merge fails, check the token's access
+and expiration, repository workflow permissions, and required checks.
 
-If you see the error "GitHub Actions is not permitted to create or approve pull requests":
-- Ensure the settings above are properly configured
-- The repository must not have branch protection rules that prevent GitHub Actions from creating PRs
-- The workflow uses the built-in `GITHUB_TOKEN` which is automatically provided
+## Cache and tags
 
+Cache publishing is managed separately. This fork does not run the upstream
+cache upload or automatic version-tag workflows. The tag utility's tests use
+local temporary repositories and do not publish tags.
