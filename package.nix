@@ -4,6 +4,7 @@
 , makeWrapper
 , gnutar
 , gzip
+, zstd
 , openssl
 , libcap
 , libz
@@ -24,31 +25,27 @@ let
   platform = platformMap.${stdenv.hostPlatform.system} or
     (throw "Codex is not supported on ${stdenv.hostPlatform.system}. Supported: aarch64-darwin, x86_64-darwin, x86_64-linux, aarch64-linux");
 
+  # Daemon bootstrap copies this complete package, including its manifest.
   nativeHashes = {
-    "aarch64-apple-darwin" = "043d5xii004svp5lanfy0s565npnfg38g7qx1hmv9g914nlxki31";
-    "x86_64-apple-darwin" = "1cf7q72ib90h86yg2h2dzl15yw1kmrld51vn8qx2i1jn1vm1lajn";
-    "x86_64-unknown-linux-musl" = "1r6x91v7j658dh2wa3xzvwp82x54ijnq3p5jddx0bfnrxkl3kcxy";
-    "aarch64-unknown-linux-musl" = "1r7z3x3akzffi83lh7ilzkg36b6wy9n9q1jslr68yvd9yijiw9m7";
-  };
-
-  # codex >= 0.143 spawns a separate `codex-code-mode-host` binary (found
-  # next to the running executable) when "code mode" is enabled. Shipped as its
-  # own release asset, so the native build must fetch and install it too.
-  codeModeHostHashes = {
-    "aarch64-apple-darwin" = "0hcriv4cwcgp728b96bihd6yf6s8jqmnk4iwhj37bab78ydg8a1f";
-    "x86_64-apple-darwin" = "1zg1gilbbqfp27p13zpnrky3hviaq81mjmbfg6jlpj32a3nwc4aj";
-    "x86_64-unknown-linux-musl" = "0a9mf0xl5j901dgfpgywf8mnk2ljmzp5s9kwh1z2wnd6ic966hii";
-    "aarch64-unknown-linux-musl" = "1vql6ascrdv4w3fpdfc93zmg7k78pbyzsblidfvh0zqrzfp5chr8";
+    "aarch64-apple-darwin" = "0b20ndp3g8lg38bga5v5r80ns764icg6165zx81k0phiavljx084";
+    "x86_64-apple-darwin" = "0f3yva2myxxhzw4wkn025lznw4921ma8ki8lr074q308ysigrxjz";
+    "x86_64-unknown-linux-musl" = "15lwrxj99m5bgwj58xdsd9cal75ygw317cg82zl2fyabyb0xl8nz";
+    "aarch64-unknown-linux-musl" = "1sb0haqzbw04rm80bwr349ip8gvgvbdifp3biyyxzdf4lh0vk57v";
   };
 
   nativeBinary = fetchurl {
-    url = "https://github.com/openai/codex/releases/download/rust-v${version}/codex-${platform}.tar.gz";
+    url = "https://github.com/openai/codex/releases/download/rust-v${version}/codex-package-${platform}.tar.zst";
     sha256 = nativeHashes.${platform};
   };
 
-  codeModeHost = fetchurl {
-    url = "https://github.com/openai/codex/releases/download/rust-v${version}/codex-code-mode-host-${platform}.tar.gz";
-    sha256 = codeModeHostHashes.${platform};
+  # The bundled ARM64 Linux rg requires a glibc loader. Use a static archive
+  # so the daemon's copied package also survives Nix store garbage collection.
+  useStaticRg = stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isAarch64;
+  staticRgVersion = "15.2.0";
+  staticRgName = "ripgrep-${staticRgVersion}-aarch64-unknown-linux-musl";
+  staticRg = fetchurl {
+    url = "https://github.com/BurntSushi/ripgrep/releases/download/${staticRgVersion}/${staticRgName}.tar.gz";
+    sha256 = "0589fkhqc7pn020m6412wphapykw2hiiz456npgrkrxg0rr1w2w0";
   };
 
   linuxRuntimePath = lib.makeBinPath (lib.optionals stdenv.isLinux [ bubblewrap ]);
@@ -61,35 +58,38 @@ stdenv.mkDerivation {
   dontPatchELF = true;
   dontStrip = true;
 
-  nativeBuildInputs = [ gnutar gzip makeWrapper ];
+  nativeBuildInputs = [ gnutar gzip zstd makeWrapper ];
   buildInputs = lib.optionals stdenv.isLinux [ openssl libcap libz ];
 
   buildPhase = ''
     runHook preBuild
     mkdir -p build
-    tar -xzf ${nativeBinary} -C build
-    mv build/codex-${platform} build/codex
-    chmod u+w,+x build/codex
-
-    tar -xzf ${codeModeHost} -C build
-    mv build/codex-code-mode-host-${platform} build/codex-code-mode-host
-    chmod u+w,+x build/codex-code-mode-host
+    tar --zstd -xf ${nativeBinary} -C build
 
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    mkdir -p $out/bin
+    mkdir -p $out/bin $out/lib
 
-    cp build/codex $out/bin/codex-raw
-    chmod +x $out/bin/codex-raw
-    cp build/codex-code-mode-host $out/bin/codex-code-mode-host
-    chmod +x $out/bin/codex-code-mode-host
-    makeWrapper "$out/bin/codex-raw" "$out/bin/${binName}" \
+    # Codex discovers its package from bin/ and the adjacent manifest.
+    cp -r build $out/lib/codex
+    ${lib.optionalString useStaticRg ''
+      rm $out/lib/codex/codex-path/rg
+      tar -xzf ${staticRg} --strip-components=1 \
+        -C $out/lib/codex/codex-path ${staticRgName}/rg
+      mkdir -p $out/share/licenses/ripgrep
+      tar -xzf ${staticRg} --strip-components=1 \
+        -C $out/share/licenses/ripgrep \
+        ${staticRgName}/COPYING ${staticRgName}/LICENSE-MIT ${staticRgName}/UNLICENSE
+    ''}
+
+    ln -s ../lib/codex/bin/codex-code-mode-host $out/bin/codex-code-mode-host
+    makeWrapper "$out/lib/codex/bin/codex" "$out/bin/${binName}" \
       --run 'export CODEX_EXECUTABLE_PATH="$HOME/.local/bin/${binName}"' \
       --set DISABLE_AUTOUPDATER 1 \
-      ${lib.optionalString stdenv.isLinux ''--prefix PATH : "${linuxRuntimePath}"''}
+      ${lib.optionalString stdenv.hostPlatform.isLinux ''--prefix PATH : "${linuxRuntimePath}"''}
     runHook postInstall
   '';
 
